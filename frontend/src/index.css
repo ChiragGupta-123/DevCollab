@@ -4,46 +4,46 @@
 
 @layer base {
   * {
-    border-color: #253554;
+    border-color: #1e293b;
   }
   body {
-    background-color: #090D16;
-    color: #CBD7EE;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #0b0f19;
+    color: #cbd5e1;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
 
-/* Custom Obsidian Scrollbar */
+/* Custom Scrollbar matching deep navy theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090D16;
+  background: #0b0f19;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #253554;
+  background: #1e293b;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4A6291;
+  background: #334155;
 }
 
 /* Glassmorphism Panel Utilities */
 .glass-panel {
-  background-color: rgba(15, 22, 36, 0.85);
+  background-color: rgba(18, 24, 38, 0.85);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(37, 53, 84, 0.7);
+  border: 1px solid rgba(30, 41, 59, 0.8);
 }
 
 .glass-panel-elevated {
-  background-color: rgba(21, 30, 48, 0.9);
+  background-color: rgba(22, 30, 48, 0.95);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(51, 71, 110, 0.8);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(43, 58, 85, 0.8);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
 }
 
 /* Monaco Remote Cursor & User Tag Styling */

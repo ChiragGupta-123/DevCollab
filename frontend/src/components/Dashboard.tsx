@@ -1,31 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Code2,
+  Search,
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  Home,
+  Folder,
+  Users,
+  PlusCircle,
   Shield,
-  Zap,
-  Lock,
-  FileCode,
-  Plus,
+  ShieldCheck,
+  Settings,
   ArrowRight,
+  MoreVertical,
+  Plus,
   Copy,
   Check,
-  Terminal,
-  Activity,
+  Tv,
+  Smartphone,
+  Cpu,
   Layers,
-  Sparkles,
+  LogOut,
   AlertTriangle,
-  FolderOpen,
-  LogOut
+  FileCode,
+  Menu,
+  X
 } from 'lucide-react';
-import {
-  Project,
-  User
-} from '../types';
-import {
-  createProject,
-  fetchProjects,
-  joinProject,
-  cn
-} from '../services/api';
+import { Project, User } from '../types';
+import { createProject, fetchProjects, joinProject, cn } from '../services/api';
 
 interface DashboardProps {
   onSelectProject: (project: Project) => void;
@@ -45,6 +48,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Invite code copy state
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
+  // Navigation & View state
+  const [activeNav, setActiveNav] = useState<'home' | 'projects' | 'security' | 'settings'>('home');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+
   // Create Project Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createName, setCreateName] = useState('');
@@ -52,7 +62,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Join Project state
+  // Join Project Modal state
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinFeedback, setJoinFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
@@ -80,6 +91,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     e.stopPropagation();
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
+    setActiveDropdownId(null);
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
@@ -121,6 +133,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setJoinFeedback({ type: 'success', msg: `Joined "${res.project.name}" as ${res.role}!` });
       setJoinCode('');
       await loadProjects();
+      if (res.project) {
+        setTimeout(() => {
+          setShowJoinModal(false);
+          onSelectProject(res.project);
+        }, 800);
+      }
     } catch (err: any) {
       setJoinFeedback({
         type: 'error',
@@ -131,316 +149,799 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // Filter projects by search query
+  const filteredProjects = projects.filter((p) =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // Helper to pick project icon matching reference design
+  const getProjectIcon = (name: string, idx: number) => {
+    const lower = name.toLowerCase();
+    if (lower.includes('ai') || lower.includes('ml') || lower.includes('quantum')) {
+      return (
+        <div className="h-10 w-10 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+          <Cpu className="h-5 w-5" />
+        </div>
+      );
+    }
+    if (lower.includes('mobile') || lower.includes('app') || lower.includes('ios')) {
+      return (
+        <div className="h-10 w-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+          <Smartphone className="h-5 w-5" />
+        </div>
+      );
+    }
+    return (
+      <div className="h-10 w-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+        <Code2 className="h-5 w-5" />
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-obsidian-950 text-obsidian-200 flex flex-col font-sans select-none overflow-y-auto">
-      {/* ─── Top Navigation Bar with Persona Switcher ─── */}
-      <header className="h-16 border-b border-obsidian-700/80 bg-obsidian-900/95 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-40">
+    <div className="min-h-screen bg-[#0b0f19] text-slate-200 flex flex-col font-sans select-none antialiased">
+      {/* ════════════════════════════════════════════════════════════════════════
+          TOP NAVIGATION HEADER
+          ════════════════════════════════════════════════════════════════════════ */}
+      <header className="h-16 border-b border-[#182032] bg-[#0b0f19] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
+        {/* Left: Brand Logo & Tagline */}
         <div className="flex items-center space-x-3">
-          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-neon-cyan to-neon-violet p-0.5 shadow-neon-cyan flex items-center justify-center">
-            <div className="h-full w-full bg-obsidian-950 rounded-[7px] flex items-center justify-center">
-              <Terminal className="h-5 w-5 text-neon-cyan" />
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#131b2e] transition"
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveNav('home')}>
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-500 to-cyan-400 p-[1.5px] shadow-lg shadow-indigo-500/20 flex items-center justify-center">
+              <div className="h-full w-full bg-[#0b0f19] rounded-[10px] flex items-center justify-center">
+                <Code2 className="h-4 w-4 text-indigo-400" />
+              </div>
             </div>
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-bold text-lg text-white tracking-wide">DevCollab</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan font-semibold">
-                v2.0 SECURE
-              </span>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-base text-white tracking-tight">DevCollab</span>
+              </div>
+              <p className="text-[11px] text-slate-400 -mt-0.5 hidden sm:block">Build Together. Code Better.</p>
             </div>
-            <p className="text-xs text-obsidian-400 font-mono -mt-0.5">Real-Time CRDT Sandbox</p>
           </div>
         </div>
 
-        {/* Logged-In User Profile & Logout */}
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2.5 px-3 py-1.5 rounded-lg border border-obsidian-700 bg-obsidian-850">
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs text-obsidian-950 shadow-sm ring-1 ring-white/10"
-              style={{ backgroundColor: currentUser.avatar_color || '#00F0FF' }}
-            >
-              {currentUser.username.charAt(0).toUpperCase()}
-            </div>
-            <div className="text-left">
-              <div className="text-xs font-semibold text-white leading-tight">
-                {currentUser.username}
-              </div>
-              {currentUser.email && (
-                <span className="text-[10px] text-obsidian-400 font-mono block">
-                  {currentUser.email}
-                </span>
-              )}
-            </div>
-          </div>
+        {/* Center: Search Bar with Ctrl K Shortcut */}
+        <div className="hidden md:flex items-center relative w-full max-w-md mx-6">
+          <Search className="h-4 w-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search projects, rooms, or users..."
+            className="w-full bg-[#111726] border border-[#1e293b] rounded-xl pl-10 pr-14 py-2 text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors"
+          />
+          <span className="absolute right-3 text-[10px] font-mono text-slate-400 bg-[#1a233a] px-1.5 py-0.5 rounded border border-[#273552]">
+            Ctrl K
+          </span>
+        </div>
 
+        {/* Right: Notifications & User Profile Menu */}
+        <div className="flex items-center space-x-3 sm:space-x-4">
           <button
-            onClick={onLogout}
-            title="Sign out of DevCollab session"
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-obsidian-700 bg-obsidian-850 hover:bg-rose-950/40 hover:border-rose-500/50 hover:text-rose-300 text-obsidian-300 transition-all text-xs font-semibold group shadow-sm"
+            title="Notifications"
+            className="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#131b2e] transition"
           >
-            <Lock className="h-3.5 w-3.5 text-obsidian-400 group-hover:text-rose-400" />
-            <span>Logout</span>
+            <Bell className="h-4 w-4" />
+            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-[#0b0f19]" />
           </button>
+
+          {/* User Profile Pill with Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center space-x-2.5 p-1.5 rounded-xl hover:bg-[#131b2e] transition"
+            >
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-sm ring-1 ring-white/10"
+                style={{ backgroundColor: currentUser.avatar_color || '#4f46e5' }}
+              >
+                {currentUser.username.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-xs font-semibold text-white hidden sm:inline">
+                {currentUser.username}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-52 rounded-2xl bg-[#131927] border border-[#1e293b] shadow-2xl p-2 z-50 animate-fade-in">
+                <div className="px-3 py-2 border-b border-[#1e293b] mb-1">
+                  <div className="text-xs font-bold text-white">{currentUser.username}</div>
+                  {currentUser.email && (
+                    <div className="text-[10px] text-slate-400 font-mono truncate">{currentUser.email}</div>
+                  )}
+                  <span className="inline-block mt-1 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                    AUTHENTICATED
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onLogout();
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-medium text-rose-300 hover:bg-rose-950/30 rounded-xl transition"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* ─── Hero Section: Security & CRDT Architecture ─── */}
-      <section className="px-8 pt-8 pb-4 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 pb-4 border-b border-obsidian-800">
-          <div>
-            <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-xs font-mono mb-2">
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>Enterprise Collaborative Engineering Environment</span>
+      {/* ════════════════════════════════════════════════════════════════════════
+          MAIN 3-COLUMN LAYOUT
+          ════════════════════════════════════════════════════════════════════════ */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* ─── 1. LEFT NAVIGATION SIDEBAR ─── */}
+        <aside
+          className={cn(
+            "fixed inset-y-16 left-0 z-30 w-60 border-r border-[#182032] bg-[#0b0f19] p-4 flex flex-col justify-between transition-transform duration-200 md:static md:translate-x-0",
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          )}
+        >
+          <div className="space-y-6">
+            <nav className="space-y-1.5">
+              <button
+                onClick={() => {
+                  setActiveNav('home');
+                  setMobileMenuOpen(false);
+                }}
+                className={cn(
+                  "w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all",
+                  activeNav === 'home'
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                    : "text-slate-400 hover:text-white hover:bg-[#131b2e]"
+                )}
+              >
+                <Home className="h-4 w-4" />
+                <span>Home</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveNav('projects');
+                  setMobileMenuOpen(false);
+                }}
+                className={cn(
+                  "w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all",
+                  activeNav === 'projects'
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                    : "text-slate-400 hover:text-white hover:bg-[#131b2e]"
+                )}
+              >
+                <Folder className="h-4 w-4" />
+                <span>My Projects</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowJoinModal(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-[#131b2e] transition-all"
+              >
+                <Users className="h-4 w-4" />
+                <span>Join Room</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowCreateModal(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-[#131b2e] transition-all"
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span>Create Room</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveNav('security');
+                  setMobileMenuOpen(false);
+                }}
+                className={cn(
+                  "w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all",
+                  activeNav === 'security'
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                    : "text-slate-400 hover:text-white hover:bg-[#131b2e]"
+                )}
+              >
+                <Shield className="h-4 w-4" />
+                <span>Security & Monitor</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveNav('settings');
+                  setMobileMenuOpen(false);
+                }}
+                className={cn(
+                  "w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all",
+                  activeNav === 'settings'
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/25"
+                    : "text-slate-400 hover:text-white hover:bg-[#131b2e]"
+                )}
+              >
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </button>
+            </nav>
+          </div>
+
+          {/* Bottom Area: Secure Coding Environment Card & System Online Status */}
+          <div className="space-y-4 pt-4">
+            <div className="p-4 rounded-2xl bg-[#111726] border border-[#1a2438]">
+              <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-3">
+                <Shield className="h-4 w-4" />
+              </div>
+              <h4 className="text-xs font-bold text-white mb-1">Secure Coding Environment</h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+                Your code is protected with real-time threat detection and sandboxed execution.
+              </p>
+              <button
+                onClick={() => setActiveNav('security')}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#182236] hover:bg-[#202d47] text-[11px] font-medium text-slate-300 hover:text-white transition"
+              >
+                <span>Learn More</span>
+                <ArrowRight className="h-3 w-3" />
+              </button>
             </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight">
-              DevCollab Architecture Kernel
-            </h1>
-            <p className="text-sm text-obsidian-400 mt-1 max-w-2xl">
-              Conflict-Free Replicated Data Types (CRDT) coupled with deterministic zero-trust SQLite RBAC and automated code injection threat scanning.
-            </p>
-          </div>
 
-          <div className="mt-4 md:mt-0 flex items-center space-x-3">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gradient-to-r from-neon-cyan to-neon-violet hover:opacity-95 text-obsidian-950 font-semibold text-xs tracking-wide shadow-neon-cyan transition-all"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Create Project</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 4 Architecture Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="glass-panel p-4 rounded-xl border border-obsidian-700 hover:border-neon-cyan/40 transition-all group">
-            <div className="h-9 w-9 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center text-neon-cyan mb-3 group-hover:scale-105 transition-transform">
-              <Lock className="h-5 w-5" />
+            {/* System Online Indicator */}
+            <div className="flex items-center space-x-2.5 px-1 py-1">
+              <div className="relative flex items-center justify-center">
+                <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                <div className="absolute h-4 w-4 rounded-full bg-emerald-400/30 animate-ping" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-white leading-tight">System Online</div>
+                <div className="text-[10px] text-slate-400 leading-tight">All services operational</div>
+              </div>
             </div>
-            <h3 className="text-sm font-semibold text-white">Zero-Trust SQLite RBAC</h3>
-            <p className="text-xs text-obsidian-400 mt-1 leading-relaxed">
-              Every REST endpoint and WebSocket frame validates caller role in SQLite. Violations log <span className="text-neon-rose font-mono">RBAC_VIOLATION_ATTEMPT</span>.
-            </p>
           </div>
+        </aside>
 
-          <div className="glass-panel p-4 rounded-xl border border-obsidian-700 hover:border-neon-emerald/40 transition-all group">
-            <div className="h-9 w-9 rounded-lg bg-neon-emerald/10 border border-neon-emerald/30 flex items-center justify-center text-neon-emerald mb-3 group-hover:scale-105 transition-transform">
-              <Zap className="h-5 w-5" />
-            </div>
-            <h3 className="text-sm font-semibold text-white">Yjs CRDT Convergence</h3>
-            <p className="text-xs text-obsidian-400 mt-1 leading-relaxed">
-              Decentralized state vector synchronization. Token-bucket rate limiter throttles socket floods at 40 events/sec.
-            </p>
-          </div>
-
-          <div className="glass-panel p-4 rounded-xl border border-obsidian-700 hover:border-neon-rose/40 transition-all group">
-            <div className="h-9 w-9 rounded-lg bg-neon-rose/10 border border-neon-rose/30 flex items-center justify-center text-neon-rose mb-3 group-hover:scale-105 transition-transform">
-              <Shield className="h-5 w-5" />
-            </div>
-            <h3 className="text-sm font-semibold text-white">RCE Threat Shield</h3>
-            <p className="text-xs text-obsidian-400 mt-1 leading-relaxed">
-              Static AST inspection blocks <span className="font-mono text-neon-rose">child_process</span>, <span className="font-mono text-neon-rose">os.system</span>, and sandbox escapes before execution.
-            </p>
-          </div>
-
-          <div className="glass-panel p-4 rounded-xl border border-obsidian-700 hover:border-neon-violet/40 transition-all group">
-            <div className="h-9 w-9 rounded-lg bg-neon-violet/10 border border-neon-violet/30 flex items-center justify-center text-neon-violet mb-3 group-hover:scale-105 transition-transform">
-              <Activity className="h-5 w-5" />
-            </div>
-            <h3 className="text-sm font-semibold text-white">Immutable Security Audit</h3>
-            <p className="text-xs text-obsidian-400 mt-1 leading-relaxed">
-              Path traversal and intrusion probes trigger <span className="font-mono text-neon-violet">PATH_TRAVERSAL_BLOCKED</span> directly to security telemetry.
-            </p>
-          </div>
-        </div>
-
-        {/* ─── Join Project Bar ─── */}
-        <div className="glass-panel p-4 rounded-xl border border-obsidian-700 mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="h-8 w-8 rounded-lg bg-neon-violet/15 text-neon-violet border border-neon-violet/30 flex items-center justify-center">
-              <Layers className="h-4 w-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-white">Join Existing Project via Invite Code</h4>
-              <p className="text-[11px] text-obsidian-400">Collaborate instantly with team members using their unique 8-character invite code.</p>
+        {/* ─── 2. CENTER COLUMN: MAIN CONTENT ─── */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+          {/* Welcome Banner with Purple/Indigo Mesh Gradient */}
+          <div className="relative overflow-hidden rounded-2xl p-6 lg:p-8 bg-gradient-to-r from-[#1c1b48]/90 via-[#151a30]/90 to-[#0e1322] border border-[#24264d] shadow-xl">
+            <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+            <div className="relative z-10">
+              <h1 className="text-2xl lg:text-3xl font-extrabold text-white flex items-center space-x-2.5 tracking-tight">
+                <span>👋</span>
+                <span>Welcome back, {currentUser.username}!</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 mt-2 font-normal">
+                Collaborate, code and build amazing things together.
+              </p>
             </div>
           </div>
 
-          <form onSubmit={handleJoinProject} className="flex items-center space-x-2 w-full md:w-auto">
-            <input
-              type="text"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="e.g. QUANTUM2025"
-              className="bg-obsidian-950 border border-obsidian-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white placeholder-obsidian-500 focus:outline-none focus:border-neon-cyan uppercase w-full md:w-56"
-            />
-            <button
-              type="submit"
-              disabled={joining || !joinCode.trim()}
-              className="px-4 py-1.5 rounded-lg bg-obsidian-800 hover:bg-obsidian-750 border border-neon-cyan/40 text-neon-cyan font-semibold text-xs tracking-wider uppercase transition disabled:opacity-50 shrink-0"
-            >
-              {joining ? 'Joining...' : 'Join Workspace'}
-            </button>
-          </form>
-        </div>
+          {/* 4 Summary Metrics Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Total Projects */}
+            <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] flex flex-col justify-between hover:border-indigo-500/30 transition">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="h-10 w-10 rounded-xl bg-purple-500/15 border border-purple-500/25 text-purple-400 flex items-center justify-center">
+                  <Folder className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Total Projects</div>
+                  <div className="text-xl font-bold text-white">{projects.length}</div>
+                </div>
+              </div>
+              <div className="text-[11px] text-emerald-400 font-medium flex items-center space-x-1">
+                <span>↑</span>
+                <span>2 this week</span>
+              </div>
+            </div>
 
-        {joinFeedback && (
-          <div className={cn(
-            "p-3 rounded-lg text-xs font-mono mb-6 flex items-center justify-between",
-            joinFeedback.type === 'success'
-              ? "bg-neon-emerald/10 border border-neon-emerald/30 text-neon-emerald"
-              : "bg-neon-rose/10 border border-neon-rose/30 text-neon-rose"
-          )}>
-            <span>{joinFeedback.msg}</span>
-            <button onClick={() => setJoinFeedback(null)} className="underline text-[10px]">Dismiss</button>
-          </div>
-        )}
+            {/* Active Rooms */}
+            <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] flex flex-col justify-between hover:border-blue-500/30 transition">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="h-10 w-10 rounded-xl bg-blue-500/15 border border-blue-500/25 text-blue-400 flex items-center justify-center">
+                  <Tv className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Active Rooms</div>
+                  <div className="text-xl font-bold text-white">{Math.max(1, projects.length > 1 ? 2 : 1)}</div>
+                </div>
+              </div>
+              <div className="text-[11px] text-emerald-400 font-medium flex items-center space-x-1">
+                <span>↑</span>
+                <span>1 this week</span>
+              </div>
+            </div>
 
-        {/* ─── Projects Grid ─── */}
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <FolderOpen className="h-4 w-4 text-neon-cyan" />
-            <h2 className="text-base font-bold text-white tracking-wide">Available Projects</h2>
-            <span className="text-xs font-mono text-obsidian-400 bg-obsidian-850 px-2 py-0.5 rounded-full border border-obsidian-700">
-              {projects.length}
-            </span>
-          </div>
-        </div>
+            {/* Online Collaborators */}
+            <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] flex flex-col justify-between hover:border-indigo-500/30 transition">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 text-indigo-400 flex items-center justify-center">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Online Collaborators</div>
+                  <div className="text-xl font-bold text-white">3</div>
+                </div>
+              </div>
+              <div className="text-[11px] text-emerald-400 font-medium flex items-center space-x-1">
+                <span>↑</span>
+                <span>1 this week</span>
+              </div>
+            </div>
 
-        {loading ? (
-          <div className="py-20 text-center">
-            <div className="inline-block animate-spin h-8 w-8 border-2 border-neon-cyan border-t-transparent rounded-full mb-3" />
-            <p className="text-xs font-mono text-obsidian-400">Decrypting workspace records from SQLite...</p>
+            {/* Security Status */}
+            <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] flex flex-col justify-between hover:border-emerald-500/30 transition">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Security Status</div>
+                  <div className="text-base font-bold text-white">Secure</div>
+                </div>
+              </div>
+              <div className="text-[11px] text-slate-400 font-medium">
+                No threats detected
+              </div>
+            </div>
           </div>
-        ) : error ? (
-          <div className="glass-panel p-6 rounded-xl border border-neon-rose/40 text-center my-8">
-            <AlertTriangle className="h-8 w-8 text-neon-rose mx-auto mb-2" />
-            <h3 className="text-sm font-semibold text-white">Database Query Failure</h3>
-            <p className="text-xs text-obsidian-400 mt-1">{error}</p>
-          </div>
-        ) : projects.length === 0 ? (
-          <div className="glass-panel p-12 rounded-xl border border-obsidian-800 text-center my-8">
-            <FileCode className="h-10 w-10 text-obsidian-600 mx-auto mb-3" />
-            <h3 className="text-sm font-semibold text-white">No Accessible Projects Found</h3>
-            <p className="text-xs text-obsidian-400 mt-1 max-w-sm mx-auto">
-              Create a new collaborative project or join an existing workspace using an invite code.
-            </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="mt-4 px-4 py-2 rounded-lg bg-neon-cyan text-obsidian-950 font-semibold text-xs inline-flex items-center space-x-1.5"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Create First Project</span>
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-16">
-            {projects.map((proj) => {
-              const role = proj.role || 'VIEWER';
-              const isOwner = role === 'OWNER';
-              const isEditor = role === 'EDITOR';
 
-              return (
-                <div
-                  key={proj.id}
-                  onClick={() => onSelectProject(proj)}
-                  className="glass-panel rounded-xl p-5 border border-obsidian-700/80 hover:border-neon-cyan/50 hover:shadow-card-glow transition-all duration-200 cursor-pointer flex flex-col justify-between group"
+          {/* Feedback banner if joined project */}
+          {joinFeedback && (
+            <div className={cn(
+              "p-3 rounded-xl text-xs font-mono flex items-center justify-between",
+              joinFeedback.type === 'success'
+                ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                : "bg-rose-500/10 border border-rose-500/30 text-rose-400"
+            )}>
+              <span>{joinFeedback.msg}</span>
+              <button onClick={() => setJoinFeedback(null)} className="underline text-[10px]">Dismiss</button>
+            </div>
+          )}
+
+          {/* My Projects Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-white">My Projects</h2>
+                <p className="text-xs text-slate-400">Your recent projects and collaboration rooms</p>
+              </div>
+              <button
+                onClick={() => setActiveNav('projects')}
+                className="flex items-center space-x-1 text-xs font-semibold text-slate-400 hover:text-white transition"
+              >
+                <span>View All</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="py-16 text-center">
+                <div className="inline-block animate-spin h-7 w-7 border-2 border-indigo-500 border-t-transparent rounded-full mb-3" />
+                <p className="text-xs font-mono text-slate-400">Loading collaborative workspaces...</p>
+              </div>
+            ) : error ? (
+              <div className="p-6 rounded-2xl bg-[#121826] border border-rose-500/30 text-center">
+                <AlertTriangle className="h-6 w-6 text-rose-400 mx-auto mb-2" />
+                <h3 className="text-sm font-semibold text-white">Failed to load projects</h3>
+                <p className="text-xs text-slate-400 mt-1">{error}</p>
+              </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="p-10 rounded-2xl bg-[#121826] border border-[#1e293b] text-center">
+                <FileCode className="h-8 w-8 text-slate-500 mx-auto mb-2" />
+                <h3 className="text-sm font-semibold text-white">No projects found</h3>
+                <p className="text-xs text-slate-400 mt-1">Get started by creating a new collaborative workspace.</p>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="mt-4 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-xs inline-flex items-center space-x-1.5"
                 >
-                  <div>
-                    {/* Header: Name + Role Badge */}
-                    <div className="flex items-start justify-between gap-2 mb-2.5">
-                      <h3 className="text-base font-bold text-white group-hover:text-neon-cyan transition-colors">
-                        {proj.name}
-                      </h3>
-                      <span
-                        className={cn(
-                          "px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase border",
-                          isOwner && "bg-neon-amber/15 text-neon-amber border-neon-amber/30",
-                          isEditor && "bg-neon-cyan/15 text-neon-cyan border-neon-cyan/30",
-                          !isOwner && !isEditor && "bg-neon-violet/15 text-neon-violet border-neon-violet/30"
-                        )}
-                      >
-                        {role}
-                      </span>
-                    </div>
+                  <Plus className="h-4 w-4" />
+                  <span>Create Project</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filteredProjects.map((proj, idx) => {
+                  const isFirst = idx === 0;
 
-                    <p className="text-xs text-obsidian-400 line-clamp-2 leading-relaxed mb-4">
-                      {proj.description || 'Distributed real-time collaborative workspace.'}
-                    </p>
-                  </div>
-
-                  {/* Footer details */}
-                  <div className="pt-3 border-t border-obsidian-800 flex items-center justify-between text-xs font-mono">
-                    {/* 1-Click Invite Code Copy */}
-                    <button
-                      onClick={(e) => handleCopyInvite(proj.invite_code, e)}
-                      title="Click to copy invite code"
-                      className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-obsidian-850 hover:bg-obsidian-800 border border-obsidian-700 text-obsidian-300 hover:text-white transition"
+                  return (
+                    <div
+                      key={proj.id}
+                      onClick={() => onSelectProject(proj)}
+                      className="p-4 rounded-2xl bg-[#131927] border border-[#1e293b] hover:border-blue-500/40 hover:bg-[#151c2e] transition-all cursor-pointer flex flex-col justify-between group relative"
                     >
-                      <span className="text-[10px] text-obsidian-500">CODE:</span>
-                      <span className="font-semibold text-neon-cyan">{proj.invite_code}</span>
-                      {copiedCode === proj.invite_code ? (
-                        <Check className="h-3.5 w-3.5 text-neon-emerald" />
-                      ) : (
-                        <Copy className="h-3 w-3 text-obsidian-400" />
-                      )}
-                    </button>
+                      <div>
+                        {/* Top: Icon + 3-dots Menu */}
+                        <div className="flex items-start justify-between mb-3">
+                          {getProjectIcon(proj.name, idx)}
+                          
+                          <div className="relative" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setActiveDropdownId(activeDropdownId === proj.id ? null : proj.id)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#1e293b] transition"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
 
-                    <div className="flex items-center space-x-1 text-neon-cyan group-hover:translate-x-1 transition-transform font-semibold text-xs">
-                      <span>Open Workspace</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
+                            {activeDropdownId === proj.id && (
+                              <div className="absolute right-0 mt-1 w-44 rounded-xl bg-[#182133] border border-[#25324d] shadow-xl p-1 z-30 animate-fade-in">
+                                <button
+                                  onClick={(e) => handleCopyInvite(proj.invite_code, e)}
+                                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-[#202d47] rounded-lg transition"
+                                >
+                                  <Copy className="h-3.5 w-3.5 text-slate-400" />
+                                  <span>Copy Invite Code</span>
+                                </button>
+                                <button
+                                  onClick={() => onSelectProject(proj)}
+                                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 text-xs text-blue-400 hover:bg-[#202d47] rounded-lg transition"
+                                >
+                                  <ArrowRight className="h-3.5 w-3.5" />
+                                  <span>Open Editor</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Title & Timestamp */}
+                        <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
+                          {proj.name}
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Last edited {isFirst ? '2 hours ago' : idx === 1 ? '5 hours ago' : '1 day ago'}
+                        </p>
+                      </div>
+
+                      {/* Bottom: Collaborator Avatars & Status Tag */}
+                      <div className="pt-4 mt-3 border-t border-[#1a2336] flex items-center justify-between">
+                        {/* Avatar stack */}
+                        <div className="flex items-center -space-x-1.5">
+                          <div className="w-6 h-6 rounded-full bg-indigo-500 ring-2 ring-[#131927] flex items-center justify-center text-[10px] font-bold text-white">
+                            A
+                          </div>
+                          <div className="w-6 h-6 rounded-full bg-blue-500 ring-2 ring-[#131927] flex items-center justify-center text-[10px] font-bold text-white">
+                            B
+                          </div>
+                          <div className="w-6 h-6 rounded-full bg-[#1e293b] ring-2 ring-[#131927] flex items-center justify-center text-[9px] font-bold text-slate-300">
+                            +2
+                          </div>
+                        </div>
+
+                        {/* Status Pill (Active / Idle) */}
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={cn(
+                              "text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                              idx < 2
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
+                                : "bg-slate-500/15 text-slate-400 border border-slate-500/25"
+                            )}
+                          >
+                            {idx < 2 ? 'Active' : 'Idle'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Activity Section */}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-base font-bold text-white">Recent Activity</h2>
+              <p className="text-xs text-slate-400">Latest updates from your projects and rooms</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] space-y-3.5">
+              {/* Activity 1 */}
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center space-x-3">
+                  <div className="h-9 w-9 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white">
+                      You joined the room <span className="font-bold">&apos;WebDev Project&apos;</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">Collaborate with your team</div>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-400 font-mono">2 hours ago</div>
+              </div>
+
+              {/* Activity 2 */}
+              <div className="flex items-center justify-between py-1 border-t border-[#1a2336] pt-3">
+                <div className="flex items-center space-x-3">
+                  <div className="h-9 w-9 rounded-full bg-indigo-500/15 text-indigo-400 flex items-center justify-center">
+                    <Code2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white">
+                      Code changes detected in <span className="font-mono text-slate-300">&apos;main.py&apos;</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">Real-time sync • WebDev Project</div>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-400 font-mono">3 hours ago</div>
+              </div>
+
+              {/* Activity 3 */}
+              <div className="flex items-center justify-between py-1 border-t border-[#1a2336] pt-3">
+                <div className="flex items-center space-x-3">
+                  <div className="h-9 w-9 rounded-full bg-purple-500/15 text-purple-400 flex items-center justify-center">
+                    <Folder className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white">
+                      You created a new project <span className="font-bold">&apos;AI-ML Project&apos;</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">Get started with your team</div>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-400 font-mono">5 hours ago</div>
+              </div>
+
+              {/* Activity 4 */}
+              <div className="flex items-center justify-between py-1 border-t border-[#1a2336] pt-3">
+                <div className="flex items-center space-x-3">
+                  <div className="h-9 w-9 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white">
+                      Rohan joined the room <span className="font-bold">&apos;Mobile App&apos;</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">Start collaborating</div>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-400 font-mono">1 day ago</div>
+              </div>
+
+              {/* Activity 5 */}
+              <div className="flex items-center justify-between py-1 border-t border-[#1a2336] pt-3">
+                <div className="flex items-center space-x-3">
+                  <div className="h-9 w-9 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white">Security scan completed</div>
+                    <div className="text-[11px] text-slate-400">No threats found • AI-ML Project</div>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-400 font-mono">1 day ago</div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* ─── 3. RIGHT SIDEBAR PANELS ─── */}
+        <aside className="w-80 flex-shrink-0 border-l border-[#182032] bg-[#0b0f19] p-4 space-y-4 overflow-y-auto hidden xl:block">
+          {/* Quick Actions Card */}
+          <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] space-y-3">
+            <h3 className="text-xs font-bold text-white tracking-wide">Quick Actions</h3>
+
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs py-2.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create New Room</span>
+            </button>
+
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="w-full bg-[#182133] hover:bg-[#1f2b42] border border-[#25324d] text-slate-200 font-medium text-xs py-2.5 rounded-xl flex items-center justify-center space-x-2 transition"
+            >
+              <Layers className="h-4 w-4 text-slate-400" />
+              <span>Join Room</span>
+            </button>
+          </div>
+
+          {/* Recent Rooms Card */}
+          <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-white tracking-wide">Recent Rooms</h3>
+              <button
+                onClick={() => setActiveNav('projects')}
+                className="flex items-center space-x-1 text-[11px] text-slate-400 hover:text-white transition"
+              >
+                <span>View All</span>
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {/* Room 1 */}
+              <div
+                onClick={() => projects[0] && onSelectProject(projects[0])}
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-[#182133] transition cursor-pointer group"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center font-bold text-xs">
+                    <Code2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white group-hover:text-blue-400 transition-colors">
+                      {projects[0]?.name || 'WebDev Project'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex items-center space-x-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span>3 online • 2m ago</span>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
+              </div>
 
-      {/* ─── Create Project Modal ─── */}
+              {/* Room 2 */}
+              <div
+                onClick={() => (projects[1] ? onSelectProject(projects[1]) : projects[0] && onSelectProject(projects[0]))}
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-[#182133] transition cursor-pointer group"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 rounded-full bg-orange-500/15 text-orange-400 flex items-center justify-center font-bold text-xs">
+                    <Code2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white group-hover:text-blue-400 transition-colors">
+                      {projects[1]?.name || 'Frontend Team'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex items-center space-x-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span>2 online • 12m ago</span>
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
+              </div>
+
+              {/* Room 3 */}
+              <div
+                onClick={() => (projects[2] ? onSelectProject(projects[2]) : projects[0] && onSelectProject(projects[0]))}
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-[#182133] transition cursor-pointer group"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 rounded-full bg-purple-500/15 text-purple-400 flex items-center justify-center font-bold text-xs">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white group-hover:text-blue-400 transition-colors">
+                      {projects[2]?.name || 'AI-ML Project'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex items-center space-x-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span>1 online • 1h ago</span>
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
+              </div>
+            </div>
+          </div>
+
+          {/* Security Overview Card */}
+          <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] space-y-3">
+            <div className="flex items-start space-x-3">
+              <div className="h-9 w-9 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-white">Security Overview</h3>
+                <div className="text-xs font-semibold text-emerald-400 mt-0.5">All systems secure</div>
+                <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                  Your code and data are protected.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveNav('security')}
+              className="w-full bg-[#182133] hover:bg-[#1f2b42] border border-[#25324d] text-slate-200 font-medium text-xs py-2 rounded-xl flex items-center justify-center space-x-1.5 transition"
+            >
+              <span>View Details</span>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Live Collaborators Card */}
+          <div className="p-4 rounded-2xl bg-[#121826] border border-[#1e293b] space-y-3">
+            <h3 className="text-xs font-bold text-white tracking-wide">Live Collaborators</h3>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center -space-x-1.5">
+                <div className="w-7 h-7 rounded-full bg-indigo-500 ring-2 ring-[#121826] flex items-center justify-center text-[10px] font-bold text-white">
+                  A
+                </div>
+                <div className="w-7 h-7 rounded-full bg-blue-500 ring-2 ring-[#121826] flex items-center justify-center text-[10px] font-bold text-white">
+                  B
+                </div>
+                <div className="w-7 h-7 rounded-full bg-emerald-500 ring-2 ring-[#121826] flex items-center justify-center text-[10px] font-bold text-white">
+                  S
+                </div>
+                <div className="w-7 h-7 rounded-full bg-[#1e293b] ring-2 ring-[#121826] flex items-center justify-center text-[10px] font-bold text-slate-300">
+                  +2
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-400 flex items-center space-x-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span>3 online • 1 in this room</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          MODAL: CREATE NEW ROOM / WORKSPACE
+          ════════════════════════════════════════════════════════════════════════ */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-obsidian-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="glass-panel-elevated rounded-2xl w-full max-w-md p-6 border border-obsidian-600 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-1 flex items-center space-x-2">
-              <Plus className="h-5 w-5 text-neon-cyan" />
-              <span>Initialize New Collaborative Workspace</span>
-            </h3>
-            <p className="text-xs text-obsidian-400 mb-4">
-              Creating a project sets your persona as the permanent OWNER with exclusive RBAC governance rights.
+        <div className="fixed inset-0 bg-[#0b0f19]/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-[#121826] rounded-2xl w-full max-w-md p-6 border border-[#1e293b] shadow-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                <Plus className="h-5 w-5 text-indigo-400" />
+                <span>Create New Room</span>
+              </h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a2336] transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">
+              Initialize a collaborative real-time room with full binary Yjs CRDT synchronization.
             </p>
 
             {createError && (
-              <div className="p-2.5 rounded bg-neon-rose/10 border border-neon-rose/30 text-neon-rose text-xs font-mono mb-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono mb-3">
                 {createError}
               </div>
             )}
 
             <form onSubmit={handleCreateProject} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-obsidian-300 mb-1">
-                  Project Name <span className="text-neon-rose">*</span>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Room Name <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={createName}
                   onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="e.g. Distributed Neural Graph"
-                  className="w-full bg-obsidian-950 border border-obsidian-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-neon-cyan"
+                  placeholder="e.g. WebDev Project"
+                  className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-obsidian-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Description
                 </label>
                 <textarea
                   value={createDesc}
                   onChange={(e) => setCreateDesc(e.target.value)}
-                  placeholder="Brief description of the repository and architecture..."
+                  placeholder="Brief summary of repository or collaboration goal..."
                   rows={3}
-                  className="w-full bg-obsidian-950 border border-obsidian-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-neon-cyan resize-none"
+                  className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 resize-none"
                 />
               </div>
 
@@ -448,16 +949,74 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold text-obsidian-400 hover:text-white transition"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating || !createName.trim()}
-                  className="px-5 py-2 rounded-lg bg-gradient-to-r from-neon-cyan to-neon-violet hover:opacity-95 text-obsidian-950 font-bold text-xs tracking-wider uppercase disabled:opacity-50 transition shadow-neon-cyan"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs tracking-wide disabled:opacity-50 transition shadow-lg shadow-indigo-600/20"
                 >
-                  {creating ? 'Initializing...' : 'Create Workspace'}
+                  {creating ? 'Creating...' : 'Create Room'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          MODAL: JOIN ROOM VIA INVITE CODE
+          ════════════════════════════════════════════════════════════════════════ */}
+      {showJoinModal && (
+        <div className="fixed inset-0 bg-[#0b0f19]/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-[#121826] rounded-2xl w-full max-w-md p-6 border border-[#1e293b] shadow-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                <Layers className="h-5 w-5 text-blue-400" />
+                <span>Join Collaboration Room</span>
+              </h3>
+              <button
+                onClick={() => setShowJoinModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a2336] transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">
+              Enter the 8-character invite code shared by your project administrator.
+            </p>
+
+            <form onSubmit={handleJoinProject} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Invite Code <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. QUANTUM2"
+                  className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3.5 py-2 text-xs font-mono uppercase text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowJoinModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={joining || !joinCode.trim()}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs tracking-wide disabled:opacity-50 transition shadow-lg shadow-indigo-600/20"
+                >
+                  {joining ? 'Joining...' : 'Join Room'}
                 </button>
               </div>
             </form>

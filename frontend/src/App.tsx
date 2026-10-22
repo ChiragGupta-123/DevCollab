@@ -431,7 +431,7 @@ export const App: React.FC = () => {
   // ─── If No Project Selected: Render Dashboard ──────────────────────────────
   if (!selectedProject) {
     return (
-      <div className="flex h-screen w-screen flex-col bg-[#090D16] text-[#CBD7EE]">
+      <div className="flex h-screen w-screen flex-col bg-[#0b0f19] text-slate-200">
         {/* Live Security Toast Banner (Visible also on Dashboard) */}
         {securityToast && (
           <div className="fixed top-4 right-4 z-50 max-w-md animate-in slide-in-from-top duration-300">
