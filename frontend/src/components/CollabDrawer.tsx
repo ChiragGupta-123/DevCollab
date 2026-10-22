@@ -299,7 +299,10 @@ export const CollabDrawer: React.FC<CollabDrawerProps> = ({
       setChatMessages(data.messages || []);
     };
     const handleMessage = (msg: ChatMessage) => {
-      setChatMessages(prev => [...prev, msg]);
+      setChatMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
     };
 
     socket.on('chat-history', handleHistory);
@@ -323,16 +326,6 @@ export const CollabDrawer: React.FC<CollabDrawerProps> = ({
     setChatSending(true);
     socket.emit('chat-message', { projectId, content });
     setChatInput('');
-    // Optimistically add own message (will be replaced by server echo)
-    const optimistic: ChatMessage = {
-      id: `opt-${Date.now()}`,
-      projectId,
-      userId,
-      username,
-      content,
-      timestamp: new Date().toISOString()
-    };
-    setChatMessages(prev => [...prev, optimistic]);
     setTimeout(() => setChatSending(false), 300);
   };
 
