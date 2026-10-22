@@ -4,8 +4,8 @@
   "private": true,
   "description": "DevCollab - Real-Time Collaborative IDE & 7-Layer Cyber-Defense Sandbox",
   "scripts": {
-    "install:backend": "npm --prefix backend install",
-    "install:frontend": "npm --prefix frontend install",
+    "install:backend": "npm --prefix backend install --include=dev",
+    "install:frontend": "npm --prefix frontend install --include=dev",
     "install:all": "npm run install:backend && npm run install:frontend",
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build",
