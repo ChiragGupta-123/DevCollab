@@ -315,6 +315,68 @@ async function executeInPistonSandbox(
 }
 
 /**
+ * Executes code via the Wandbox API sandbox (free, public, isolated online compiler)
+ */
+async function executeInWandboxSandbox(
+  code: string,
+  language: string,
+  stdin?: string
+): Promise<ExecutionResult> {
+  const startTime = Date.now();
+  const effectiveLang = (language || '').toLowerCase().trim();
+
+  let compiler = 'gcc-head';
+  if (effectiveLang === 'c') {
+    compiler = 'gcc-head-c';
+  } else if (effectiveLang === 'python' || effectiveLang === 'py') {
+    compiler = 'cpython-head';
+  }
+
+  const controller = new AbortController();
+  const timeoutTimer = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch('https://wandbox.org/api/compile.json', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'DevCollab-ZeroTrustSandbox/1.0'
+      },
+      body: JSON.stringify({
+        compiler,
+        code,
+        stdin: typeof stdin === 'string' ? stdin : '',
+        'compiler-option-raw': effectiveLang !== 'c' && !effectiveLang.startsWith('py') ? '-std=c++17\n-O2' : '-O2'
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutTimer);
+
+    if (!response.ok) {
+      throw new Error(`Wandbox API returned HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data: any = await response.json();
+
+    const stdout = data.program_output || '';
+    const stderr = data.compiler_error || data.compiler_message || data.program_error || '';
+    const exitCode = typeof data.status === 'string' ? parseInt(data.status, 10) || 0 : (data.status || 0);
+
+    return {
+      stdout,
+      stderr: stderr ? stderr.trim() + '\n' : '',
+      exitCode,
+      executionTimeMs: Math.max(1, Date.now() - startTime),
+      memoryUsageMb: 128
+    };
+  } catch (err: any) {
+    clearTimeout(timeoutTimer);
+    throw err;
+  }
+}
+
+/**
  * Offline Native Compiler Sandbox for C/C++ and Python.
  * Compiles and executes in an isolated temporary directory with strict 3,000ms timeout,
  * memory guards, safe stdin forwarding, and automatic scratch cleanup.
@@ -640,27 +702,53 @@ export function createExecuteRouter(io: Server): Router {
         timestamp: new Date().toISOString()
       });
 
-      let finalResult: ExecutionResult;
+      let finalResult: ExecutionResult = {
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        executionTimeMs: 0
+      };
       const effectiveLang = (language || 'javascript').toLowerCase();
 
-      // Primary Sandbox: Piston API (remote container)
-      try {
-        finalResult = await executeInPistonSandbox(code, effectiveLang, stdin);
-      } catch (pistonError: any) {
-        // Offline Local Fallback:
-        // 1. JavaScript & TypeScript -> Isolated Node V8 VM Sandbox
-        // 2. C++, C & Python -> Sandboxed local compiler / runtime with strict timeout & input forwarding
-        if (effectiveLang === 'javascript' || effectiveLang === 'js' || effectiveLang === 'typescript' || effectiveLang === 'ts' || effectiveLang === 'node') {
-          finalResult = executeInLocalVmSandbox(code, stdin);
-        } else if (effectiveLang === 'cpp' || effectiveLang === 'c++' || effectiveLang === 'c' || effectiveLang === 'python' || effectiveLang === 'py') {
-          finalResult = await executeInLocalNativeSandbox(code, effectiveLang, stdin);
-        } else {
-          finalResult = {
-            stdout: '',
-            stderr: `[SANDBOX NOTICE] Remote execution sandbox (Piston) was unreachable: ${pistonError.message}.\nLocal offline fallback sandbox currently supports JavaScript, TypeScript, Python, and C/C++. Please check internet connectivity or run supported languages.`,
-            exitCode: 1,
-            executionTimeMs: 0
-          };
+      // 1. JavaScript & TypeScript -> Isolated Node V8 VM Sandbox (ultra-fast, zero latency, safe)
+      if (effectiveLang === 'javascript' || effectiveLang === 'js' || effectiveLang === 'typescript' || effectiveLang === 'ts' || effectiveLang === 'node') {
+        finalResult = executeInLocalVmSandbox(code, stdin);
+      } else {
+        // 2. Compiled & other languages (C++, C, Python, etc.)
+        let remoteSuccess = false;
+
+        // Try custom Piston instance if configured
+        if (process.env.PISTON_URL) {
+          try {
+            finalResult = await executeInPistonSandbox(code, effectiveLang, stdin);
+            remoteSuccess = true;
+          } catch {
+            // fall through
+          }
+        }
+
+        // Try isolated Wandbox online sandbox compiler
+        if (!remoteSuccess) {
+          try {
+            finalResult = await executeInWandboxSandbox(code, effectiveLang, stdin);
+            remoteSuccess = true;
+          } catch {
+            // fall through to local native compiler
+          }
+        }
+
+        // Try local native compiler if available on host (e.g. g++ / python3)
+        if (!remoteSuccess) {
+          try {
+            finalResult = await executeInLocalNativeSandbox(code, effectiveLang, stdin);
+          } catch (nativeErr: any) {
+            finalResult = {
+              stdout: '',
+              stderr: `[SANDBOX NOTICE] Online compiler sandbox was unreachable and local native compiler is not installed.\nPlease check network connectivity or execute in JavaScript / TypeScript.`,
+              exitCode: 1,
+              executionTimeMs: 0
+            };
+          }
         }
       }
 

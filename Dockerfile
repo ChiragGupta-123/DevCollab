@@ -22,6 +22,9 @@ ENV NODE_ENV=production
 ENV PORT=4000
 ENV CLIENT_ORIGIN=*
 
+# Install g++ and python3 for native compiler support
+RUN apt-get update && apt-get install -y --no-install-recommends g++ make python3 && rm -rf /var/lib/apt/lists/*
+
 # Copy package files and install only production dependencies
 WORKDIR /app/backend
 COPY backend/package.json ./
