@@ -1,16 +1,16 @@
 # ── Stage 1: Build Frontend ─────────────────────────
 FROM node:20-bookworm-slim AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
+COPY frontend/package.json ./
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
 # ── Stage 2: Build Backend ──────────────────────────
 FROM node:20-bookworm-slim AS backend-builder
 WORKDIR /app/backend
-COPY backend/package*.json ./
-RUN npm ci
+COPY backend/package.json ./
+RUN npm install
 COPY backend/ ./
 RUN npm run build
 
@@ -24,8 +24,8 @@ ENV CLIENT_ORIGIN=*
 
 # Copy package files and install only production dependencies
 WORKDIR /app/backend
-COPY backend/package*.json ./
-RUN npm ci --omit=dev
+COPY backend/package.json ./
+RUN npm install --omit=dev
 COPY --from=backend-builder /app/backend/dist ./dist
 
 # Copy built frontend assets
