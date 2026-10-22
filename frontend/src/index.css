@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: #253554;
+  }
+  body {
+    background-color: #090D16;
+    color: #CBD7EE;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+/* Custom Obsidian Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090D16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #253554;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4A6291;
+}
+
+/* Glassmorphism Panel Utilities */
+.glass-panel {
+  background-color: rgba(15, 22, 36, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(37, 53, 84, 0.7);
+}
+
+.glass-panel-elevated {
+  background-color: rgba(21, 30, 48, 0.9);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(51, 71, 110, 0.8);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* Monaco Remote Cursor & User Tag Styling */
+.monaco-remote-cursor {
+  position: absolute;
+  width: 2px !important;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 0 8px currentColor;
+  animation: cursorBlink 1.2s ease-in-out infinite;
+}
+
+.monaco-remote-cursor-label {
+  position: absolute;
+  top: -22px;
+  left: 0;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #090D16;
+  background-color: currentColor;
+  pointer-events: none;
+  z-index: 101;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transform: translateY(0);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.monaco-remote-selection {
+  background-color: currentColor;
+  opacity: 0.18;
+  border-radius: 2px;
+}
+
+/* Breakpoint Glyph Marker */
+.monaco-breakpoint-glyph {
+  background: #FF0055;
+  border-radius: 50%;
+  width: 10px !important;
+  height: 10px !important;
+  margin-left: 5px;
+  margin-top: 4px;
+  box-shadow: 0 0 8px #FF0055;
+  cursor: pointer;
+}
+
+.monaco-breakpoint-disabled-glyph {
+  background: rgba(255, 0, 85, 0.35);
+  border: 1px solid #FF0055;
+  border-radius: 50%;
+  width: 10px !important;
+  height: 10px !important;
+  margin-left: 5px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+/* Animations */
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes pulseBorder {
+  0%, 100% { border-color: rgba(0, 240, 255, 0.4); }
+  50% { border-color: rgba(0, 240, 255, 0.9); }
+}
+
+.animate-pulse-border {
+  animation: pulseBorder 2s infinite;
+}
