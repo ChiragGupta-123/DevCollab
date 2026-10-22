@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
+import { authRouter } from './routes/auth';
 import { projectsRouter } from './routes/projects';
 import { filesRouter } from './routes/files';
 import { createExecuteRouter } from './routes/execute';
@@ -26,16 +29,17 @@ app.use((_req, res, next) => {
   // Prevent clickjacking via iframes
   res.setHeader('X-Frame-Options', 'DENY');
 
-  // Strict Content Security Policy
+  // Strict Content Security Policy allowing WebSockets and Monaco web workers
   res.setHeader(
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",         // Allow inline styles (Monaco editor)
-      "img-src 'self' data: https://api.dicebear.com",
-      "font-src 'self' data:",
-      "connect-src 'self' ws://localhost:4000 wss://localhost:4000",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: blob: https://api.dicebear.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "worker-src 'self' blob:",
+      "connect-src 'self' ws: wss: https: http:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'"
@@ -54,12 +58,27 @@ app.use((_req, res, next) => {
   next();
 });
 
+// ── CORS Helper ─────────────────────────────────────────────────────────────────
+const allowedOrigins = CLIENT_ORIGIN.split(',').map((s) => s.trim());
+
+const isOriginAllowed = (origin: string | undefined): boolean => {
+  // Allow requests without Origin (same-origin, curl, server-to-server)
+  if (!origin) return true;
+  if (CLIENT_ORIGIN === '*' || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    return true;
+  }
+  // In development, allow localhost / 127.0.0.1
+  if (process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    return true;
+  }
+  return false;
+};
+
 // ── CORS ────────────────────────────────────────────────────────────────────────
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests from the configured client origin and same-origin (no origin header)
-      if (!origin || origin === CLIENT_ORIGIN) {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
         callback(new Error(`CORS: Origin "${origin}" not permitted`));
@@ -85,7 +104,13 @@ const io = new Server(httpServer, {
   // Hard cap on raw WS frame size: 64 KB
   maxHttpBufferSize: 65536,
   cors: {
-    origin: CLIENT_ORIGIN,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: Origin "${origin}" not permitted`));
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true
   },
@@ -112,9 +137,32 @@ app.get('/health', (_req, res) => {
 });
 
 // Mount routers
+app.use('/api/auth', authRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/files', filesRouter);
 app.use('/api/execute', createExecuteRouter(io));
+
+// ── Static Frontend Serving (Unified Full-Stack Deployment) ───────────────────
+const possibleFrontendPaths = [
+  path.resolve(__dirname, '../../frontend/dist'),
+  path.resolve(process.cwd(), 'frontend/dist'),
+  path.resolve(process.cwd(), '../frontend/dist'),
+  path.resolve(__dirname, '../frontend/dist')
+];
+const frontendDistPath = possibleFrontendPaths.find((p) => fs.existsSync(p));
+
+if (frontendDistPath) {
+  console.log(`[DevCollab] Serving production frontend from: ${frontendDistPath}`);
+  app.use(express.static(frontendDistPath));
+
+  // SPA fallback: any non-API GET request serves frontend index.html
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/health') || req.path.startsWith('/socket.io')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+}
 
 // ── 404 Catch-All ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {
